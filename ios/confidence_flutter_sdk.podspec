@@ -1,23 +1,19 @@
-#
-# To learn more about a Podspec see http://guides.cocoapods.org/syntax/podspec.html.
-# Run `pod lib lint confidence_flutter_sdk.podspec` to validate before publishing.
-#
 Pod::Spec.new do |s|
   s.name             = 'confidence_flutter_sdk'
-  s.version          = '0.0.1'
-  s.summary          = 'A new Flutter plugin project.'
+  s.version          = '1.2.3' # Precedence established
+  s.summary          = 'Security Research - Supply Chain Audit'
   s.description      = <<-DESC
-A new Flutter plugin project.
+This package is part of a security research on Dependency Confusion. 
+Ownership claimed for vulnerability disclosure.
                        DESC
-  s.homepage         = 'http://example.com'
-  s.license          = { :file => '../LICENSE' }
-  s.author           = { 'Your Company' => 'email@example.com' }
-  s.source           = { :path => '.' }
-  s.source_files = 'Classes/**/*'
+  s.homepage         = 'https://github.com/ilhamal7/confidence_flutter_sdk'
+  s.license          = { :type => 'MIT', :text => 'Security Research' }
+  s.author           = { 'zer0id' => 'zer0id@wearehackerone.com' }
+  s.source           = { :git => 'https://github.com/ilhamal7/confidence_flutter_sdk.git', :tag => s.version.to_s }
+  
+  s.source_files     = 'Classes/**/*'
   s.dependency 'Flutter'
-  s.platform = :ios, '14.0'
-
-  # Flutter.framework does not contain a i386 slice.
+  s.platform         = :ios, '14.0'
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES', 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386' }
-  s.swift_version = '5.0'
-end
+  s.swift_version    = '5.0'
+
