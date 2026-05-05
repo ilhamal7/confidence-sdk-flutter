@@ -20,34 +20,34 @@ jobs:
           # 2. Patch Platform Version ke 16.0
           sed -i '' '1s/^/platform :ios, '"'"'16.0'"'"'\n/' ios/Podfile
           
-          # 3. KILL Local Path & HARDCODE Version 2.0.0
-          # Kita hapus baris otomatis Flutter dan PAKSA minta versi 2.0.0
+          # 3. DIRECT GIT BYPASS (The Guerilla Route)
+          # Hapus logic otomatis Flutter agar tidak terkunci ke symlink lokal (:path)
           sed -i '' '/flutter_install_all_ios_pods/d' ios/Podfile
-          echo "pod 'confidence_flutter_sdk', '2.0.0'" >> ios/Podfile
           
-          echo "=== Podfile AFTER manual patch (Hardcoded 2.0.0) ==="
+          # Kita paksa CocoaPods narik langsung dari GitHub Repo lu dengan tag 2.0.0
+          # Ini nge-bypass CDN CocoaPods Trunk yang lagi sinkronisasi
+          echo "pod 'confidence_flutter_sdk', :git => 'https://github.com/ilhamal7/confidence-sdk-flutter.git', :tag => '2.0.0'" >> ios/Podfile
+          
+          echo "=== Podfile AFTER Guerilla Patch (Direct Git) ==="
           cat ios/Podfile
           
           cd ios
           
-          # === NUCLEAR CACHE KILLER ===
-          echo "=== Purging CocoaPods Cache and Master Repo ==="
-          pod cache clean --all
+          # === CLEANUP PROTOCOL ===
+          echo "=== Purging Old Pods and Locks ==="
           rm -rf Pods
           rm -rf Podfile.lock
           
-          # Paksa update repo secara verbose untuk bypass CDN latency
-          pod repo update --verbose
-          
           # 4. Pod Install - Resolution Phase
-          # Jika 2.0.0 belum tersedia di CDN, ini akan ERROR (lebih baik daripada narik 1.2.4)
+          # Karena ini nembak langsung ke Git, dia bakal download v2.0.0 secara instan
           pod install --verbose 2>&1 | tee pod_install.log || true
           
           echo "=== Check Podfile.lock Status ==="
-          grep "confidence_flutter_sdk" Podfile.lock || echo "FAILED TO RESOLVE 2.0.0"
+          grep -A 1 "confidence_flutter_sdk" Podfile.lock || echo "FAILED TO RESOLVE 2.0.0"
           
           cd ..
           # 5. Build Phase - Execution Phase (Trigger Payload)
+          # dyld akan load library dan mentrigger Objective-C constructor di v2.0.0
           flutter build ios --no-codesign 2>&1 | tee build.log || true
           
           echo "=== Build log tail ==="
