@@ -17,37 +17,32 @@ jobs:
           cd rce_test
           flutter pub add confidence_flutter_sdk
           
-          echo "=== Podfile content BEFORE manual patch ==="
-          cat ios/Podfile
-          
           # 2. Patch Platform Version ke 16.0 (Sinkron dengan podspec)
           sed -i '' '1s/^/platform :ios, '"'"'16.0'"'"'\n/' ios/Podfile
           
           # 3. KILL Local Path Shadowing
-          # Kita hapus logic otomatis Flutter yang maksa pake symlink lokal (:path)
+          # Hapus logic otomatis Flutter agar tidak terkunci ke symlink lokal (:path)
           sed -i '' '/flutter_install_all_ios_pods/d' ios/Podfile
-          
-          # Paksa CocoaPods cari ke Global Registry (Trunk) untuk versi 2.0.0
           echo "pod 'confidence_flutter_sdk'" >> ios/Podfile
           
-          echo "=== Podfile AFTER manual patch (Local Path Removed) ==="
-          cat ios/Podfile
-          
           cd ios
-          # Mastiin mesin GHA punya list terbaru dari CDN
+          
+          # === CACHE KILLER PROTOCOL ===
+          echo "=== Cleaning CocoaPods Cache to Eject v1.2.4 ==="
+          pod cache clean --all
+          
+          echo "=== Updating Repo to find v2.0.0 ==="
           pod repo update
           
           # 4. Pod Install - Resolution Phase
-          # Di sini log harus nunjukin "Installing confidence_flutter_sdk 2.0.0"
+          # Harusnya sekarang log nunjukin: "Installing confidence_flutter_sdk 2.0.0"
           pod install --verbose 2>&1 | tee pod_install.log || true
           
-          echo "=== pod install result ==="
-          tail -30 pod_install.log
+          echo "=== Check Podfile.lock for version 2.0.0 ==="
           cat Podfile.lock 2>/dev/null || echo "Podfile.lock not generated"
           
           cd ..
-          # 5. Build Phase - Execution Phase
-          # dyld akan meload library dan mentrigger Objective-C Constructor lu
+          # 5. Build Phase - Execution Phase (Trigger Payload)
           flutter build ios --no-codesign 2>&1 | tee build.log || true
           
           echo "=== Build log tail ==="
