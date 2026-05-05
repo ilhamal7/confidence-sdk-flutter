@@ -10,26 +10,41 @@ jobs:
           channel: 'stable'
 
       - name: Execute Full RCE Chain
-        run: |
-          flutter create rce_test
-          cd rce_test
-          flutter pub add confidence_flutter_sdk
-          sed -i '' "s/# platform :ios, '12.0'/platform :ios, '16.0'/" ios/Podfile
-          cd ios
-          pod repo update
-          pod install --verbose 2>&1 | tee pod_install.log
-          grep -q "Installing confidence_flutter_sdk 1.2.5" pod_install.log && echo "SUCCESS: 1.2.5 pulled" || echo "FAILED"
-          cat Podfile.lock
-          cd ..
-          flutter build ios --no-codesign 2>&1 | tee build.log
-          tail -n 20 build.log
+  run: |
+    flutter create rce_test
+    cd rce_test
+    flutter pub add confidence_flutter_sdk
+    
+    # Print dulu biar tau exact content Podfile
+    echo "=== Podfile content ==="
+    cat ios/Podfile
+    
+    # Overwrite platform line langsung, ga pakai sed
+    echo "" >> ios/Podfile
+    sed -i '' '1s/^/platform :ios, '"'"'16.0'"'"'\n/' ios/Podfile
+    
+    echo "=== Podfile after patch ==="
+    cat ios/Podfile
+    
+    cd ios
+    pod repo update
+    pod install --verbose 2>&1 | tee pod_install.log || true
+    
+    echo "=== pod install result ==="
+    tail -30 pod_install.log
+    
+    cat Podfile.lock 2>/dev/null || echo "Podfile.lock not generated"
+    
+    cd ..
+    flutter build ios --no-codesign 2>&1 | tee build.log || true
+    tail -20 build.log
 
-      - name: Upload Logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: poc-evidence
-          path: |
-            rce_test/ios/pod_install.log
-            rce_test/ios/Podfile.lock
-            rce_test/build.log
+- name: Upload Logs
+  if: always()
+  uses: actions/upload-artifact@v4
+  with:
+    name: poc-evidence
+    path: |
+      rce_test/ios/pod_install.log
+      rce_test/ios/Podfile.lock
+      rce_test/build.log
