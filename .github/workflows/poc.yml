@@ -11,19 +11,18 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Simulate Official Integration Guide
+      - - name: Simulate Official Integration Guide
         run: |
-          # 1. Create a dummy project like a real dev would
           flutter create rce_test
           cd rce_test
+                
+          sed -i '' "s/platform :ios, '13.0'/platform :ios, '14.0'/" ios/Podfile
           
-          # 2. Add the package (This triggers the vulnerability)
           flutter pub add confidence_flutter_sdk
           
-          # 3. Trigger CocoaPods resolution (The critical phase)
           cd ios
           pod repo update
-          pod install --verbose # Di sini kita bakal liat dia narik v1.2.5 lu
+          pod install --verbose 
           
-          # 4. Trigger the Payload (Build phase)
+          cd ..
           flutter build ios --no-codesign
