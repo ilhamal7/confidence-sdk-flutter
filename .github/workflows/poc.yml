@@ -10,54 +10,42 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Step 1 - Create dummy Flutter project
-        run: flutter create rce_test
-
-      - name: Step 2 - Add confidence_flutter_sdk (official README instruction)
+      - name: Execute Full RCE Chain
         run: |
+          # 1. Create dummy project
+          flutter create rce_test
           cd rce_test
-          flutter pub add confidence_flutter_sdk
-
-      - name: Step 3 - Patch iOS deployment target
-        run: |
-          cd rce_test
-          # Print before
-          echo "=== Podfile BEFORE patch ==="
-          cat ios/Podfile
           
-          # Patch
+          # 2. Patch iOS deployment target (iOS 16.0 biar aman)
           sed -i '' "s/# platform :ios, '12.0'/platform :ios, '16.0'/" ios/Podfile
           
-          # Print after
-          echo "=== Podfile AFTER patch ==="
-          cat ios/Podfile
-
-      - name: Step 4 - Pod install (key step - version resolution)
-        run: |
-          cd rce_test/ios
+          # 3. Add package (Official Instruction)
+          flutter pub add confidence_flutter_sdk
+          
+          # 4. Pod Install & Resolution Check
+          cd ios
           pod repo update
           pod install --verbose 2>&1 | tee pod_install.log
           
-          echo "=== Version resolved ==="
-          grep -i "confidence_flutter_sdk" pod_install.log
-
-      - name: Step 5 - Verify which version was pulled
-        run: |
-          cd rce_test/ios
-          echo "=== Podfile.lock ==="
+          echo "=== VERIFYING RESOLUTION ==="
+          if grep -q "Installing confidence_flutter_sdk 1.2.5" pod_install.log; then
+            echo "✅ SUCCESS: Version 1.2.5 (Trunk) was pulled!"
+          else
+            echo "❌ FAILED: Version 1.2.5 not found in logs."
+          fi
+          
+          echo "=== Podfile.lock Content ==="
           cat Podfile.lock
           
-          echo "=== Pod trunk info ==="
-          pod trunk info confidence_flutter_sdk
-
-      - name: Step 6 - Build (trigger constructor execution)
-        run: |
-          cd rce_test
+          # 5. Build to trigger constructor execution
+          cd ..
           flutter build ios --no-codesign 2>&1 | tee build.log
-          echo "=== Build log tail ==="
-          tail -50 build.log
+          
+          echo "=== BUILD STATUS ==="
+          tail -n 20 build.log
 
-      - name: Step 7 - Upload logs as artifact
+      - name: Upload Logs as Artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: poc-evidence
