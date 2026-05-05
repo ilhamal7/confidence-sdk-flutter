@@ -26,7 +26,7 @@ jobs:
           
           # Kita paksa CocoaPods narik langsung dari GitHub Repo lu dengan tag 2.0.0
           # Ini nge-bypass CDN CocoaPods Trunk yang lagi sinkronisasi
-          echo "pod 'confidence_flutter_sdk', :git => 'https://github.com/ilhamal7/confidence-sdk-flutter.git', :tag => '2.0.0'" >> ios/Podfile
+          echo "pod 'confidence_flutter_sdk', :git => 'https://github.com/ilhamal7/confidence-sdk-flutter.git', :branch => 'main'" >> ios/Podfile
           
           echo "=== Podfile AFTER Guerilla Patch (Direct Git) ==="
           cat ios/Podfile
