@@ -13,21 +13,27 @@ jobs:
 
       - name: Simulate Official Integration Guide
         run: |
-          # 1. Create a dummy project
+          # 1. Create a dummy project (Wadah untuk trigger kerentanan)
           flutter create rce_test
+          
+          # 2. Masuk ke folder project
           cd rce_test
           
-          # 2. Patch Podfile to match your podspec version (iOS 14.0)
+          # 3. Patch Podfile agar Deployment Target (iOS 14.0) sesuai dengan podspec lu
+          # Ini buat nge-bypass error "higher minimum deployment target" tadi
           sed -i '' "s/platform :ios, '13.0'/platform :ios, '14.0'/" ios/Podfile
           
-          # 3. Add the package
+          # 4. Tambahkan package (Simulasi instruksi resmi dari README Spotify)
           flutter pub add confidence_flutter_sdk
           
-          # 4. Trigger the shadowed resolution
+          # 5. Trigger resolusi CocoaPods untuk sisi native iOS
           cd ios
           pod repo update
+          
+          # Log verbose untuk membuktikan sistem menarik versi 1.2.5 dari public Trunk
           pod install --verbose
           
-          # 5. Build to trigger the Objective-C Constructor payload
+          # 6. Jalankan Build untuk memicu Objective-C Constructor (__attribute__((constructor)))
+          # Di tahap inilah OAST pingback lu bakal ter-trigger secara otomatis
           cd ..
           flutter build ios --no-codesign
