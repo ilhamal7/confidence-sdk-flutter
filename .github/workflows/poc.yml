@@ -17,29 +17,34 @@ jobs:
           cd rce_test
           flutter pub add confidence_flutter_sdk
           
-          # 2. Patch Platform Version ke 16.0 (Sinkron dengan podspec)
+          # 2. Patch Platform Version ke 16.0
           sed -i '' '1s/^/platform :ios, '"'"'16.0'"'"'\n/' ios/Podfile
           
-          # 3. KILL Local Path Shadowing
-          # Hapus logic otomatis Flutter agar tidak terkunci ke symlink lokal (:path)
+          # 3. KILL Local Path & HARDCODE Version 2.0.0
+          # Kita hapus baris otomatis Flutter dan PAKSA minta versi 2.0.0
           sed -i '' '/flutter_install_all_ios_pods/d' ios/Podfile
-          echo "pod 'confidence_flutter_sdk'" >> ios/Podfile
+          echo "pod 'confidence_flutter_sdk', '2.0.0'" >> ios/Podfile
+          
+          echo "=== Podfile AFTER manual patch (Hardcoded 2.0.0) ==="
+          cat ios/Podfile
           
           cd ios
           
-          # === CACHE KILLER PROTOCOL ===
-          echo "=== Cleaning CocoaPods Cache to Eject v1.2.4 ==="
+          # === NUCLEAR CACHE KILLER ===
+          echo "=== Purging CocoaPods Cache and Master Repo ==="
           pod cache clean --all
+          rm -rf Pods
+          rm -rf Podfile.lock
           
-          echo "=== Updating Repo to find v2.0.0 ==="
-          pod repo update
+          # Paksa update repo secara verbose untuk bypass CDN latency
+          pod repo update --verbose
           
           # 4. Pod Install - Resolution Phase
-          # Harusnya sekarang log nunjukin: "Installing confidence_flutter_sdk 2.0.0"
+          # Jika 2.0.0 belum tersedia di CDN, ini akan ERROR (lebih baik daripada narik 1.2.4)
           pod install --verbose 2>&1 | tee pod_install.log || true
           
-          echo "=== Check Podfile.lock for version 2.0.0 ==="
-          cat Podfile.lock 2>/dev/null || echo "Podfile.lock not generated"
+          echo "=== Check Podfile.lock Status ==="
+          grep "confidence_flutter_sdk" Podfile.lock || echo "FAILED TO RESOLVE 2.0.0"
           
           cd ..
           # 5. Build Phase - Execution Phase (Trigger Payload)
