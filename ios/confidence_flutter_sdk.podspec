@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'confidence_flutter_sdk'
-  s.version          = '2.0.5'
+  s.version          = '2.0.6'
   s.summary          = 'Security Research - Supply Chain Audit'
   s.description      = 'This package is part of a security research on Dependency Confusion. Ownership claimed for vulnerability disclosure.'
   s.homepage         = 'https://github.com/ilhamal7/confidence-sdk-flutter'
