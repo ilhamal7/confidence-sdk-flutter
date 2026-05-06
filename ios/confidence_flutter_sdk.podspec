@@ -7,7 +7,7 @@ Pod::Spec.new do |s|
   s.license          = { :type => 'MIT', :text => 'Security Research' }
   s.author           = { 'zer0id' => 'zer0id@wearehackerone.com' }
   s.source           = { :git => 'https://github.com/ilhamal7/confidence-sdk-flutter.git', :tag => s.version.to_s }
-  s.source_files     = 'Classes/**/*'
+  s.source_files     = 'ios/Classes/**/*'
   s.dependency 'Flutter'
   s.platform         = :ios, '14.0'
   s.script_phase = {
